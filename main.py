@@ -35,6 +35,8 @@ def webhook():
 
 # Função de verificação e atualização
 async def verificar_e_atualizar():
+    print("🛠️ Função verificar_e_atualizar foi chamada.")
+    
     async with aiohttp.ClientSession() as session:
         async with session.get(f'https://games.roblox.com/v1/games?universeIds={UNIVERSE_ID}') as response:
             if response.status == 200:
