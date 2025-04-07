@@ -83,6 +83,11 @@ start_time = time.time()
 
 @bot.event
 async def on_ready():
+    guild = bot.get_guild(GUILD_ID)
+    channel = guild.get_channel(CHANNEL_ID)
+    print(f"🔎 Servidor: {guild.name if guild else 'não encontrado'}")
+    print(f"🔎 Canal: {channel.name if channel else 'não encontrado'}")
+    
     await bot.change_presence(
         activity=discord.Game(name="🎮 OverPunch 🥊🔥"),
         status=discord.Status.online
