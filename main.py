@@ -65,7 +65,6 @@ intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
 
-cooldown_delay = 1  # Cooldown inicial
 start_time = time.time()  # Marca quando o bot iniciou
 
 @bot.event
@@ -75,51 +74,13 @@ async def on_ready():
         status=discord.Status.online
     )
     print(f'✅ Bot conectado como {bot.user}')
-    update_channel_name.start()
-
+    
     # Sincroniza comandos de barra
     try:
         synced = await tree.sync(guild=discord.Object(id=GUILD_ID))
         print(f'✅ Comandos sincronizados: {len(synced)}')
     except Exception as e:
         print(f'❌ Erro ao sincronizar comandos: {e}')
-
-@tasks.loop(seconds=1)
-async def update_channel_name():
-    global cooldown_delay
-
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(f'https://games.roblox.com/v1/games?universeIds={UNIVERSE_ID}') as response:
-                if response.status == 200:
-                    data = await response.json()
-                    jogando_agora = data['data'][0]['playing']
-
-                    # Atualiza nome do canal
-                    guild = bot.get_guild(GUILD_ID)
-                    channel = guild.get_channel(CHANNEL_ID)
-                    if channel:
-                        await channel.edit(name=f'〔🟢〕Active Counter: {jogando_agora}')
-                    else:
-                        print("❌ Canal não encontrado.")
-
-                    # Atualiza status do bot (jogando)
-                    await bot.change_presence(
-                        activity=discord.Game(name=f"🎮 OverPunch 🥊🔥 | {jogando_agora} online"),
-                        status=discord.Status.online
-                    )
-
-                    print(f'✅ Atualizado: {jogando_agora} jogadores')
-                    cooldown_delay = 1
-                else:
-                    print(f'⚠️ API respondeu com erro: {response.status}')
-                    cooldown_delay = min(cooldown_delay * 2, 300)
-
-        except Exception as e:
-            print(f'❌ Erro ao tentar atualizar: {e}')
-            cooldown_delay = min(cooldown_delay * 2, 300)
-
-    await asyncio.sleep(cooldown_delay)
 
 # ================= ADMIN COMANDOS =====================
 @tree.command(name="kick", description="Expulsa um usuário do servidor", guild=discord.Object(id=GUILD_ID))
