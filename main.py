@@ -21,7 +21,7 @@ def home():
 def webhook():
     print("✅ Webhook recebido!")
 
-    if bot.is_closed() or not bot.is_ready():
+if bot.is_closed() or not bot.is_ready():
     print("⚠️ Bot ainda não está pronto ou está fechado.")
     return "Bot não pronto.", 503
     
