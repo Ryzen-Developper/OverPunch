@@ -41,6 +41,8 @@ async def verificar_e_atualizar():
         async with session.get(f'https://games.roblox.com/v1/games?universeIds={UNIVERSE_ID}') as response:
             if response.status == 200:
                 data = await response.json()
+                print("📥 Dados recebidos da API:", data)
+                
                 jogando_agora = data['data'][0]['playing']
                 print(f"🔄 Jogadores online: {jogando_agora}")
 
