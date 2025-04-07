@@ -6,7 +6,7 @@ import asyncio
 import os
 import time
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, request
 from threading import Thread
 
 # Flask para manter o bot online
@@ -15,6 +15,31 @@ app = Flask(__name__)
 @app.route('/')
 def home():
     return "Bot está rodando!"
+
+# ROTA DE WEBHOOK DO ROBLOX
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    asyncio.run_coroutine_threadsafe(verificar_e_atualizar(), bot.loop)
+    return "Webhook recebido!", 200
+
+async def verificar_e_atualizar():
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f'https://games.roblox.com/v1/games?universeIds={UNIVERSE_ID}') as response:
+            if response.status == 200:
+                data = await response.json()
+                jogando_agora = data['data'][0]['playing']
+
+                guild = bot.get_guild(GUILD_ID)
+                channel = guild.get_channel(CHANNEL_ID)
+                if channel:
+                    await channel.edit(name=f'〔🟢〕Active Counter: {jogando_agora}')
+
+                await bot.change_presence(
+                    activity=discord.Game(name=f"🎮 OverPunch 🥊🔥 | {jogando_agora} online"),
+                    status=discord.Status.online
+                )
+
+# Thread do Flask
 
 def run():
     app.run(host='0.0.0.0', port=8080)
