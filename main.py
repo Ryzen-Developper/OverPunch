@@ -4,9 +4,24 @@ from discord import app_commands
 import aiohttp
 import asyncio
 import os
-from dotenv import load_dotenv
-from keep_alive import keep_alive  # Para manter o bot online no Replit
 import time
+from dotenv import load_dotenv
+from flask import Flask
+from threading import Thread
+
+# Flask para manter o bot online
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot está rodando!"
+
+def run():
+    app.run(host='0.0.0.0', port=8080)
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
 
 # Inicia o servidor keep_alive
 keep_alive()
@@ -21,7 +36,7 @@ GUILD_ID = 1358529264349085849
 CHANNEL_ID = 1358565119092723742
 
 # Intents e bot setup
-intents = discord.Intents.default()
+intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
 
@@ -81,7 +96,50 @@ async def update_channel_name():
 
     await asyncio.sleep(cooldown_delay)
 
-# Slash Command para jogar
+# ================= ADMIN COMANDOS =====================
+@tree.command(name="kick", description="Expulsa um usuário do servidor", guild=discord.Object(id=GUILD_ID))
+@app_commands.describe(user="Usuário para expulsar", motivo="Motivo da expulsão")
+async def kick_command(interaction: discord.Interaction, user: discord.Member, motivo: str = "Não especificado"):
+    if not interaction.user.guild_permissions.kick_members:
+        await interaction.response.send_message("❌ Você não tem permissão para usar este comando.", ephemeral=True)
+        return
+    await user.kick(reason=motivo)
+    await interaction.response.send_message(f"👢 {user.name} foi expulso. Motivo: {motivo}")
+
+@tree.command(name="ban", description="Bane um usuário do servidor", guild=discord.Object(id=GUILD_ID))
+@app_commands.describe(user="Usuário para banir", motivo="Motivo do banimento")
+async def ban_command(interaction: discord.Interaction, user: discord.Member, motivo: str = "Não especificado"):
+    if not interaction.user.guild_permissions.ban_members:
+        await interaction.response.send_message("❌ Você não tem permissão para usar este comando.", ephemeral=True)
+        return
+    await user.ban(reason=motivo)
+    await interaction.response.send_message(f"🔨 {user.name} foi banido. Motivo: {motivo}")
+
+@tree.command(name="clear", description="Apaga mensagens de um canal", guild=discord.Object(id=GUILD_ID))
+@app_commands.describe(quantidade="Quantidade de mensagens para apagar (máx 100)")
+async def clear_command(interaction: discord.Interaction, quantidade: int):
+    if not interaction.user.guild_permissions.manage_messages:
+        await interaction.response.send_message("❌ Você não tem permissão para usar este comando.", ephemeral=True)
+        return
+    if quantidade > 100:
+        await interaction.response.send_message("⚠️ Você só pode apagar até 100 mensagens por vez.", ephemeral=True)
+        return
+    await interaction.channel.purge(limit=quantidade)
+    await interaction.response.send_message(f"🧹 {quantidade} mensagens apagadas com sucesso.", ephemeral=True)
+
+@tree.command(name="banlist", description="Lista de usuários banidos", guild=discord.Object(id=GUILD_ID))
+async def banlist_command(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.ban_members:
+        await interaction.response.send_message("❌ Você não tem permissão para usar este comando.", ephemeral=True)
+        return
+    bans = await interaction.guild.bans()
+    if not bans:
+        await interaction.response.send_message("✅ Nenhum usuário banido no servidor.", ephemeral=True)
+    else:
+        nomes = [f"{ban.user.name}#{ban.user.discriminator}" for ban in bans]
+        await interaction.response.send_message("🔨 Banidos:\n" + "\n".join(nomes), ephemeral=True)
+
+# ================== OUTROS COMANDOS =====================
 @tree.command(name="jogar", description="Receba um botão para entrar no OverPunch 🥊🔥", guild=discord.Object(id=GUILD_ID))
 async def jogar_command(interaction: discord.Interaction):
     embed = discord.Embed(
@@ -101,7 +159,6 @@ async def jogar_command(interaction: discord.Interaction):
 
     await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
 
-# Comando /ajuda
 @tree.command(name="ajuda", description="Veja todos os comandos disponíveis", guild=discord.Object(id=GUILD_ID))
 async def ajuda_command(interaction: discord.Interaction):
     embed = discord.Embed(
@@ -118,7 +175,6 @@ async def ajuda_command(interaction: discord.Interaction):
     embed.set_footer(text="Powered by OverPunch")
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# Comando /info
 @tree.command(name="info", description="Mostra informações sobre o bot", guild=discord.Object(id=GUILD_ID))
 async def info_command(interaction: discord.Interaction):
     embed = discord.Embed(
@@ -131,7 +187,6 @@ async def info_command(interaction: discord.Interaction):
     embed.set_footer(text="Feito com 💙 para a comunidade Roblox")
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# Comando /status
 @tree.command(name="status", description="Veja o status atual do bot e jogadores online", guild=discord.Object(id=GUILD_ID))
 async def status_command(interaction: discord.Interaction):
     async with aiohttp.ClientSession() as session:
@@ -149,13 +204,11 @@ async def status_command(interaction: discord.Interaction):
             else:
                 await interaction.response.send_message("❌ Não foi possível obter o status no momento.", ephemeral=True)
 
-# Comando /ping
 @tree.command(name="ping", description="Veja a latência do bot", guild=discord.Object(id=GUILD_ID))
 async def ping_command(interaction: discord.Interaction):
     latency = round(bot.latency * 1000)
     await interaction.response.send_message(f'🏓 Pong! Latência: {latency}ms', ephemeral=True)
 
-# Comando /uptime
 @tree.command(name="uptime", description="Veja há quanto tempo o bot está online", guild=discord.Object(id=GUILD_ID))
 async def uptime_command(interaction: discord.Interaction):
     current_time = time.time()
@@ -165,7 +218,6 @@ async def uptime_command(interaction: discord.Interaction):
     uptime_str = f"{hours}h {minutes}m {seconds}s"
     await interaction.response.send_message(f'🕒 Uptime: {uptime_str}', ephemeral=True)
 
-# Comando /jogo
 @tree.command(name="jogo", description="Veja detalhes sobre o jogo OverPunch 🥊🔥", guild=discord.Object(id=GUILD_ID))
 async def jogo_command(interaction: discord.Interaction):
     async with aiohttp.ClientSession() as session:
