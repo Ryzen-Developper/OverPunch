@@ -155,11 +155,11 @@ async def jogar_command(interaction):
         description="Clique no botão abaixo para entrar no jogo no Roblox.",
         color=0x43B581
     )
-    embed.set_thumbnail(url="https://tr.rbxcdn.com/3f688f75e6b2dc47c9738cd6dca3fcdf/150/150/Image/Png")
+    embed.set_thumbnail(url="https://tr.rbxcdn.com/180DAY-cb2b84693fb73b0faaef8b0cb7bea703/768/432/Image/Webp/noFilter")
     embed.set_footer(text="Powered by OverPunch")
 
     view = discord.ui.View()
-    button = discord.ui.Button(label="Entrar no OverPunch", url="https://www.roblox.com/games/7495593772/OverPunch")
+    button = discord.ui.Button(label="Entrar no OverPunch", url="https://www.roblox.com/games/137269319376582/OverPunch")
     view.add_item(button)
     await interaction.response.send_message(embed=embed, view=view)
 
