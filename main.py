@@ -26,7 +26,8 @@ def webhook():
     return "Atualizado", 200
 
 def run():
-    app.run(host='0.0.0.0', port=8080)
+    from waitress import serve
+    serve(app, host='0.0.0.0', port=8080)
 
 def keep_alive():
     t = Thread(target=run)
@@ -89,9 +90,10 @@ async def on_ready():
     except Exception as e:
         print(f'❌ Erro ao sincronizar comandos: {e}')
 
-# ================= COMANDOS USANDO CACHE =====================
+# ================= COMANDOS =====================
 @tree.command(name="status", description="Veja o status atual do bot e jogadores online", guild=discord.Object(id=GUILD_ID))
 async def status_command(interaction: discord.Interaction):
+    if interaction.response.is_done(): return
     embed = discord.Embed(
         title="📊 Status Atual",
         description=f"Atualmente, **{jogadores_online}** pessoas estão jogando OverPunch 🥊🔥.",
@@ -101,6 +103,7 @@ async def status_command(interaction: discord.Interaction):
 
 @tree.command(name="jogo", description="Veja detalhes sobre o jogo OverPunch 🥊🔥", guild=discord.Object(id=GUILD_ID))
 async def jogo_command(interaction: discord.Interaction):
+    if interaction.response.is_done(): return
     embed = discord.Embed(
         title="📌 Informações do Jogo",
         description=f"**OverPunch 🥊🔥**\n[🔗 Acessar no Roblox](https://www.roblox.com/games/7495593772/OverPunch)",
@@ -112,70 +115,75 @@ async def jogo_command(interaction: discord.Interaction):
     embed.set_footer(text="Powered by OverPunch")
     await interaction.response.send_message(embed=embed, ephemeral=False)
 
-# Slash Command para jogar
-@tree.command(name="jogar", description="Receba um botão para entrar no OverPunch 🥊🔥", guild=discord.Object(id=GUILD_ID))
-async def jogar_command(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="🎮 Jogue OverPunch 🥊🔥 agora!",
-        description="Clique no botão abaixo para entrar no jogo no Roblox.",
-        color=0x43B581
-    )
-    embed.set_thumbnail(url="https://tr.rbxcdn.com/3f688f75e6b2dc47c9738cd6dca3fcdf/150/150/Image/Png")
-    embed.set_footer(text="Powered by OverPunch")
-
-    view = discord.ui.View()
-    button = discord.ui.Button(
-        label="Entrar no OverPunch",
-        url="https://www.roblox.com/games/7495593772/OverPunch"
-    )
-    view.add_item(button)
-
-    await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
-
-# Comando /ajuda
 @tree.command(name="ajuda", description="Veja todos os comandos disponíveis", guild=discord.Object(id=GUILD_ID))
 async def ajuda_command(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="📖 Lista de Comandos",
-        description="Aqui estão os comandos disponíveis:",
-        color=0x7289DA
-    )
-    embed.add_field(name="/jogar", value="Receba um botão para entrar no OverPunch 🥊🔥", inline=False)
-    embed.add_field(name="/info", value="Mostra informações sobre o bot", inline=False)
-    embed.add_field(name="/status", value="Veja o status atual do bot e jogadores online", inline=False)
-    embed.add_field(name="/ping", value="Veja a latência do bot", inline=False)
-    embed.add_field(name="/uptime", value="Veja há quanto tempo o bot está online", inline=False)
-    embed.add_field(name="/jogo", value="Veja detalhes sobre o jogo OverPunch 🥊🔥", inline=False)
-    embed.set_footer(text="Powered by OverPunch")
+    if interaction.response.is_done(): return
+    embed = discord.Embed(title="📚 Comandos Disponíveis", color=0x3498db)
+    embed.add_field(name="/status", value="Mostra quantos jogadores estão online no momento.", inline=False)
+    embed.add_field(name="/jogo", value="Exibe informações sobre o jogo OverPunch.", inline=False)
+    embed.add_field(name="/info", value="Mostra informações sobre o bot.", inline=False)
+    embed.add_field(name="/ping", value="Mostra a latência do bot.", inline=False)
+    embed.add_field(name="/uptime", value="Mostra há quanto tempo o bot está online.", inline=False)
+    embed.add_field(name="/kick", value="Expulsa um usuário do servidor (admin).", inline=False)
+    embed.add_field(name="/ban", value="Bane um usuário do servidor (admin).", inline=False)
+    embed.add_field(name="/clear", value="Limpa mensagens no canal (admin).", inline=False)
+    embed.add_field(name="/banlist", value="Mostra a lista de banidos (admin).", inline=False)
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# Comando /info
-@tree.command(name="info", description="Mostra informações sobre o bot", guild=discord.Object(id=GUILD_ID))
+@tree.command(name="info", description="Veja informações sobre o bot", guild=discord.Object(id=GUILD_ID))
 async def info_command(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="ℹ️ Informações do Bot",
-        description="Este bot mostra o número de jogadores ativos no OverPunch 🥊🔥 e muito mais.",
-        color=0x5865F2
-    )
-    embed.add_field(name="Desenvolvedor", value="kauax2 (Discord) / kaua23193 (Roblox)", inline=True)
-    embed.add_field(name="Jogo", value="[OverPunch 🥊🔥](https://www.roblox.com/games/7495593772/OverPunch)", inline=True)
-    embed.set_footer(text="Feito com 💙 para a comunidade Roblox")
+    if interaction.response.is_done(): return
+    embed = discord.Embed(title="🤖 Informações do Bot", color=0x7289da)
+    embed.add_field(name="Criador", value="kaua23193", inline=True)
+    embed.add_field(name="Linguagem", value="Python 🐍", inline=True)
+    embed.set_footer(text="Feito para o OverPunch 🥊🔥")
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# Comando /ping
-@tree.command(name="ping", description="Veja a latência do bot", guild=discord.Object(id=GUILD_ID))
+@tree.command(name="ping", description="Veja o ping do bot", guild=discord.Object(id=GUILD_ID))
 async def ping_command(interaction: discord.Interaction):
+    if interaction.response.is_done(): return
     latency = round(bot.latency * 1000)
-    await interaction.response.send_message(f'🏓 Pong! Latência: {latency}ms', ephemeral=True)
+    await interaction.response.send_message(f"🏓 Pong! Latência: {latency}ms", ephemeral=True)
 
-# Comando /uptime
 @tree.command(name="uptime", description="Veja há quanto tempo o bot está online", guild=discord.Object(id=GUILD_ID))
 async def uptime_command(interaction: discord.Interaction):
+    if interaction.response.is_done(): return
     current_time = time.time()
     uptime_seconds = int(current_time - start_time)
-    hours, remainder = divmod(uptime_seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    uptime_str = f"{hours}h {minutes}m {seconds}s"
-    await interaction.response.send_message(f'🕒 Uptime: {uptime_str}', ephemeral=True)
+    uptime_str = time.strftime('%H:%M:%S', time.gmtime(uptime_seconds))
+    await interaction.response.send_message(f"⏱️ Uptime: {uptime_str}", ephemeral=True)
+
+# ================= COMANDOS ADMINISTRATIVOS =====================
+@tree.command(name="kick", description="Expulse um membro do servidor", guild=discord.Object(id=GUILD_ID))
+@app_commands.checks.has_permissions(kick_members=True)
+async def kick_command(interaction: discord.Interaction, membro: discord.Member, motivo: str = "Não informado"):
+    if interaction.response.is_done(): return
+    await membro.kick(reason=motivo)
+    await interaction.response.send_message(f"✅ {membro.mention} foi expulso. Motivo: {motivo}", ephemeral=True)
+
+@tree.command(name="ban", description="Bane um membro do servidor", guild=discord.Object(id=GUILD_ID))
+@app_commands.checks.has_permissions(ban_members=True)
+async def ban_command(interaction: discord.Interaction, membro: discord.Member, motivo: str = "Não informado"):
+    if interaction.response.is_done(): return
+    await membro.ban(reason=motivo)
+    await interaction.response.send_message(f"🚫 {membro.mention} foi banido. Motivo: {motivo}", ephemeral=True)
+
+@tree.command(name="clear", description="Limpa mensagens do canal", guild=discord.Object(id=GUILD_ID))
+@app_commands.checks.has_permissions(manage_messages=True)
+async def clear_command(interaction: discord.Interaction, quantidade: int):
+    if interaction.response.is_done(): return
+    await interaction.channel.purge(limit=quantidade)
+    await interaction.response.send_message(f"🧹 {quantidade} mensagens foram apagadas.", ephemeral=True)
+
+@tree.command(name="banlist", description="Mostra a lista de banidos", guild=discord.Object(id=GUILD_ID))
+@app_commands.checks.has_permissions(ban_members=True)
+async def banlist_command(interaction: discord.Interaction):
+    if interaction.response.is_done(): return
+    banidos = await interaction.guild.bans()
+    if not banidos:
+        await interaction.response.send_message("📜 Nenhum usuário banido.", ephemeral=True)
+    else:
+        lista = "\n".join([f"{ban.user.name}#{ban.user.discriminator}" for ban in banidos])
+        await interaction.response.send_message(f"📜 Lista de banidos:\n{lista}", ephemeral=True)
 
 bot.run(TOKEN)
