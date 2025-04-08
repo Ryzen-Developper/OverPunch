@@ -40,30 +40,36 @@ def webhook():
 async def verificar_e_atualizar():
     print("🛠️ Função verificar_e_atualizar foi chamada.")
     async with aiohttp.ClientSession() as session:
-        async with session.get(f'https://games.roblox.com/v1/games?universeIds={UNIVERSE_ID}') as response:
-            print(f"🌐 Resposta da API Roblox: {response.status}")
-            if response.status == 200:
-                data = await response.json()
-                print("📥 Dados recebidos da API:", data)
-                
-                jogando_agora = data['data'][0]['playing']
-                print(f"🔄 Jogadores online: {jogando_agora}")
+        try:
+            print("🌐 Solicitando dados da API Roblox...")
+            async with session.get(f'https://games.roblox.com/v1/games?universeIds={UNIVERSE_ID}') as response:
+                print(f"📶 Status da resposta da API: {response.status}")
+                if response.status == 200:
+                    data = await response.json()
+                    print("📥 Dados recebidos da API:", data)
 
-                guild = bot.get_guild(GUILD_ID)
-                channel = guild.get_channel(CHANNEL_ID)
-                if channel:
-                    await channel.edit(name=f'〔🟢〕Active Counter: {jogando_agora}')
-                    print("✅ Canal atualizado com sucesso.")
+                    jogando_agora = data['data'][0]['playing']
+                    print(f"🔄 Jogadores online: {jogando_agora}")
+
+                    guild = bot.get_guild(GUILD_ID)
+                    print(f"🧭 Servidor encontrado: {guild.name if guild else 'None'}")
+
+                    channel = guild.get_channel(CHANNEL_ID) if guild else None
+                    if channel:
+                        await channel.edit(name=f'〔🟢〕Active Counter: {jogando_agora}')
+                        print("✅ Canal atualizado com sucesso.")
+                    else:
+                        print("❌ Canal não encontrado!")
+
+                    await bot.change_presence(
+                        activity=discord.Game(name=f"🎮 OverPunch 🥊🔥 | {jogando_agora} online"),
+                        status=discord.Status.online
+                    )
+                    print("✅ Status do bot atualizado.")
                 else:
-                    print("❌ Canal não encontrado!")
-
-                await bot.change_presence(
-                    activity=discord.Game(name=f"🎮 OverPunch 🥊🔥 | {jogando_agora} online"),
-                    status=discord.Status.online
-                )
-                print("✅ Status atualizado.")
-            else:
-                print(f"❌ Erro ao buscar dados na API do Roblox: {response.status}")
+                    print(f"❌ Erro ao buscar dados da API do Roblox: {response.status}")
+        except Exception as e:
+            print(f"❌ Exceção durante a verificação e atualização: {e}")
 
 # ========== THREAD PARA FLASK ==========
 def run():
