@@ -6,15 +6,24 @@ import asyncio
 import os
 import time
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, request
 from threading import Thread
 
-# Flask para manter o bot online
+# Flask para manter o bot online e escutar o webhook
 app = Flask(__name__)
+
+# Variável de cache local
+jogadores_online = 0
 
 @app.route('/')
 def home():
     return "Bot está rodando!"
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    print("📩 Webhook recebido: solicitando atualização da contagem de jogadores...")
+    asyncio.run_coroutine_threadsafe(atualizar_jogadores(), bot.loop)
+    return "Atualizado", 200
 
 def run():
     app.run(host='0.0.0.0', port=8080)
@@ -39,107 +48,70 @@ CHANNEL_ID = 1358565119092723742
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
+start_time = time.time()
 
-cooldown_delay = 1  # Cooldown inicial
-start_time = time.time()  # Marca quando o bot iniciou
+# Função que atualiza o cache e status
+async def atualizar_jogadores():
+    global jogadores_online
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(f'https://games.roblox.com/v1/games?universeIds={UNIVERSE_ID}') as response:
+                if response.status == 200:
+                    data = await response.json()
+                    jogadores_online = data['data'][0]['playing']
+
+                    # Atualiza nome do canal
+                    guild = bot.get_guild(GUILD_ID)
+                    channel = guild.get_channel(CHANNEL_ID)
+                    if channel:
+                        await channel.edit(name=f'〔🟢〕Active Counter: {jogadores_online}')
+
+                    # Atualiza status do bot
+                    await bot.change_presence(
+                        activity=discord.Game(name=f"🎮 OverPunch 🥊🔥 | {jogadores_online} online"),
+                        status=discord.Status.online
+                    )
+
+                    print(f"✅ Atualizado via webhook: {jogadores_online} jogadores online")
+                else:
+                    print(f"⚠️ Erro ao consultar API da Roblox: {response.status}")
+        except Exception as e:
+            print(f"❌ Erro durante atualização: {e}")
 
 @bot.event
 async def on_ready():
-    await bot.change_presence(
-        activity=discord.Game(name="🎮 OverPunch 🥊🔥"),
-        status=discord.Status.online
-    )
+    await atualizar_jogadores()
     print(f'✅ Bot conectado como {bot.user}')
-    update_channel_name.start()
 
-    # Sincroniza comandos de barra
     try:
         synced = await tree.sync(guild=discord.Object(id=GUILD_ID))
         print(f'✅ Comandos sincronizados: {len(synced)}')
     except Exception as e:
         print(f'❌ Erro ao sincronizar comandos: {e}')
 
-@tasks.loop(seconds=1)
-async def update_channel_name():
-    global cooldown_delay
+# ================= COMANDOS USANDO CACHE =====================
+@tree.command(name="status", description="Veja o status atual do bot e jogadores online", guild=discord.Object(id=GUILD_ID))
+async def status_command(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="📊 Status Atual",
+        description=f"Atualmente, **{jogadores_online}** pessoas estão jogando OverPunch 🥊🔥.",
+        color=0x00FF00
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(f'https://games.roblox.com/v1/games?universeIds={UNIVERSE_ID}') as response:
-                if response.status == 200:
-                    data = await response.json()
-                    jogando_agora = data['data'][0]['playing']
+@tree.command(name="jogo", description="Veja detalhes sobre o jogo OverPunch 🥊🔥", guild=discord.Object(id=GUILD_ID))
+async def jogo_command(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="📌 Informações do Jogo",
+        description=f"**OverPunch 🥊🔥**\n[🔗 Acessar no Roblox](https://www.roblox.com/games/7495593772/OverPunch)",
+        color=0xFFD700
+    )
+    embed.set_thumbnail(url="https://tr.rbxcdn.com/3f688f75e6b2dc47c9738cd6dca3fcdf/150/150/Image/Png")
+    embed.add_field(name="👑 Dono", value="kaua23193", inline=True)
+    embed.add_field(name="👥 Jogando agora", value=str(jogadores_online), inline=True)
+    embed.set_footer(text="Powered by OverPunch")
+    await interaction.response.send_message(embed=embed, ephemeral=False)
 
-                    # Atualiza nome do canal
-                    guild = bot.get_guild(GUILD_ID)
-                    channel = guild.get_channel(CHANNEL_ID)
-                    if channel:
-                        await channel.edit(name=f'〔🟢〕Active Counter: {jogando_agora}')
-                    else:
-                        print("❌ Canal não encontrado.")
-
-                    # Atualiza status do bot (jogando)
-                    await bot.change_presence(
-                        activity=discord.Game(name=f"🎮 OverPunch 🥊🔥 | {jogando_agora} online"),
-                        status=discord.Status.online
-                    )
-
-                    print(f'✅ Atualizado: {jogando_agora} jogadores')
-                    cooldown_delay = 1
-                else:
-                    print(f'⚠️ API respondeu com erro: {response.status}')
-                    cooldown_delay = min(cooldown_delay * 2, 300)
-
-        except Exception as e:
-            print(f'❌ Erro ao tentar atualizar: {e}')
-            cooldown_delay = min(cooldown_delay * 2, 300)
-
-    await asyncio.sleep(cooldown_delay)
-
-# ================= ADMIN COMANDOS =====================
-@tree.command(name="kick", description="Expulsa um usuário do servidor", guild=discord.Object(id=GUILD_ID))
-@app_commands.describe(user="Usuário para expulsar", motivo="Motivo da expulsão")
-async def kick_command(interaction: discord.Interaction, user: discord.Member, motivo: str = "Não especificado"):
-    if not interaction.user.guild_permissions.kick_members:
-        await interaction.response.send_message("❌ Você não tem permissão para usar este comando.", ephemeral=True)
-        return
-    await user.kick(reason=motivo)
-    await interaction.response.send_message(f"👢 {user.name} foi expulso. Motivo: {motivo}")
-
-@tree.command(name="ban", description="Bane um usuário do servidor", guild=discord.Object(id=GUILD_ID))
-@app_commands.describe(user="Usuário para banir", motivo="Motivo do banimento")
-async def ban_command(interaction: discord.Interaction, user: discord.Member, motivo: str = "Não especificado"):
-    if not interaction.user.guild_permissions.ban_members:
-        await interaction.response.send_message("❌ Você não tem permissão para usar este comando.", ephemeral=True)
-        return
-    await user.ban(reason=motivo)
-    await interaction.response.send_message(f"🔨 {user.name} foi banido. Motivo: {motivo}")
-
-@tree.command(name="clear", description="Apaga mensagens de um canal", guild=discord.Object(id=GUILD_ID))
-@app_commands.describe(quantidade="Quantidade de mensagens para apagar (máx 100)")
-async def clear_command(interaction: discord.Interaction, quantidade: int):
-    if not interaction.user.guild_permissions.manage_messages:
-        await interaction.response.send_message("❌ Você não tem permissão para usar este comando.", ephemeral=True)
-        return
-    if quantidade > 100:
-        await interaction.response.send_message("⚠️ Você só pode apagar até 100 mensagens por vez.", ephemeral=True)
-        return
-    await interaction.channel.purge(limit=quantidade)
-    await interaction.response.send_message(f"🧹 {quantidade} mensagens apagadas com sucesso.", ephemeral=True)
-
-@tree.command(name="banlist", description="Lista de usuários banidos", guild=discord.Object(id=GUILD_ID))
-async def banlist_command(interaction: discord.Interaction):
-    if not interaction.user.guild_permissions.ban_members:
-        await interaction.response.send_message("❌ Você não tem permissão para usar este comando.", ephemeral=True)
-        return
-    bans = await interaction.guild.bans()
-    if not bans:
-        await interaction.response.send_message("✅ Nenhum usuário banido no servidor.", ephemeral=True)
-    else:
-        nomes = [f"{ban.user.name}#{ban.user.discriminator}" for ban in bans]
-        await interaction.response.send_message("🔨 Banidos:\n" + "\n".join(nomes), ephemeral=True)
-
-# ================== OUTROS COMANDOS =====================
 # Slash Command para jogar
 @tree.command(name="jogar", description="Receba um botão para entrar no OverPunch 🥊🔥", guild=discord.Object(id=GUILD_ID))
 async def jogar_command(interaction: discord.Interaction):
@@ -190,24 +162,6 @@ async def info_command(interaction: discord.Interaction):
     embed.set_footer(text="Feito com 💙 para a comunidade Roblox")
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# Comando /status
-@tree.command(name="status", description="Veja o status atual do bot e jogadores online", guild=discord.Object(id=GUILD_ID))
-async def status_command(interaction: discord.Interaction):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(f'https://games.roblox.com/v1/games?universeIds={UNIVERSE_ID}') as response:
-            if response.status == 200:
-                data = await response.json()
-                jogando_agora = data['data'][0]['playing']
-
-                embed = discord.Embed(
-                    title="📊 Status Atual",
-                    description=f"Atualmente, **{jogando_agora}** pessoas estão jogando OverPunch 🥊🔥.",
-                    color=0x00FF00
-                )
-                await interaction.response.send_message(embed=embed, ephemeral=True)
-            else:
-                await interaction.response.send_message("❌ Não foi possível obter o status no momento.", ephemeral=True)
-
 # Comando /ping
 @tree.command(name="ping", description="Veja a latência do bot", guild=discord.Object(id=GUILD_ID))
 async def ping_command(interaction: discord.Interaction):
@@ -224,28 +178,4 @@ async def uptime_command(interaction: discord.Interaction):
     uptime_str = f"{hours}h {minutes}m {seconds}s"
     await interaction.response.send_message(f'🕒 Uptime: {uptime_str}', ephemeral=True)
 
-# Comando /jogo
-@tree.command(name="jogo", description="Veja detalhes sobre o jogo OverPunch 🥊🔥", guild=discord.Object(id=GUILD_ID))
-async def jogo_command(interaction: discord.Interaction):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(f'https://games.roblox.com/v1/games?universeIds={UNIVERSE_ID}') as response:
-            if response.status == 200:
-                data = await response.json()
-                jogo = data['data'][0]
-
-                embed = discord.Embed(
-                    title="📌 Informações do Jogo",
-                    description=f"**OverPunch 🥊🔥**\n[🔗 Acessar no Roblox](https://www.roblox.com/games/137269319376582/OverPunch-NEW)",
-                    color=0xFFD700
-                )
-                embed.set_thumbnail(url=jogo['thumbnails'][0]['imageUrl'] if jogo.get('thumbnails') else "https://tr.rbxcdn.com/3f688f75e6b2dc47c9738cd6dca3fcdf/150/150/Image/Png")
-                embed.add_field(name="👑 Dono", value="kaua23193", inline=True)
-                embed.add_field(name="👥 Jogando agora", value=str(jogo['playing']), inline=True)
-                embed.set_footer(text="Powered by OverPunch")
-
-                await interaction.response.send_message(embed=embed, ephemeral=False)
-            else:
-                await interaction.response.send_message("❌ Não foi possível obter as informações do jogo.", ephemeral=True)
-                
-# Roda o bot
 bot.run(TOKEN)
